@@ -28,6 +28,18 @@ def run_model(model_type, venv_path):
     args = [venv_path,
             "train.py"
             ]
+    
+    #! settings for running on an instance with high end GPU
+    # args.extend(shlex.split(f"--output_dir ./trained_models/{model_type} --model_type {model_type.split('-')[0]} "
+    #                         f"--model_name_or_path ./trained_models/{model_type} --predict_file ./data/test.json "
+    #                         "--do_eval "
+    #                         "--version_2_with_negative  --per_gpu_eval_batch_size=800 --max_seq_length 512 "
+    #                         "--threads 30 "
+    #                         "--max_answer_length "
+    #                         "512 --doc_stride 256 --save_steps 1000 --n_best_size 20 --overwrite_output_dir"))
+    # process = subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True)
+
+
     args.extend(shlex.split(f"--output_dir ./trained_models/{model_type} --model_type {model_type.split('-')[0]} "
                             f"--model_name_or_path ./trained_models/{model_type} --predict_file ./data/test.json "
                             "--do_eval "
