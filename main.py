@@ -299,7 +299,7 @@ def take_min_stats(list_of_stats):
             if key == 'name':
                 pass
             else:
-                if value < minimized_advanced_scores[key]:
+                if value < minimized_prec_recall_scores[key]:
                     minimized_prec_recall_scores[key] = value
 
     minimized_precisions = np.array(precisions).min(axis=0)
@@ -346,7 +346,7 @@ def take_max_stats(list_of_stats):
             if key == 'name':
                 pass
             else:
-                if value > maximized_advanced_scores[key]:
+                if value > maximized_prec_recall_scores[key]:
                     maximized_prec_recall_scores[key] = value
 
     maximized_precisions = np.array(precisions).max(axis=0)
