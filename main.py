@@ -3,38 +3,48 @@ from transformers import AutoTokenizer
 import spacy
 import random
 import os
+import os.path as osp
 from evaluate_model import run_model, stats_precisions_recalls
-from plot_model import eval_model
+from collections import OrderedDict
+import numpy as np
+
 
 is_chance = lambda chance: random.random() <= chance
 
 
 filters = [
     {
-        "name": "MaskAllProperNouns",
-        "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent],
+        "name": "Baseline",
+        "filtered_tokens": lambda doc: [],
         "condition": lambda ent, doc: True,
         "mask_with": None,
         "num_runs": None,
     },
-    # { # probabilistic filter
-    #     "name": "MaskAllProperNounsProbabilistic",
-    #     "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent if is_chance(0.5)],
-    #     "condition": lambda ent, doc: True,
-    #     "mask_with": None,
-    #     "num_runs": 6,
-    # },
-    {
-        "name": "MaskPersonAndGPEProperNouns",
-        "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent if ent.label_ == "PERSON" or ent.label_ == "GPE"],
+    {  # probabilistic filter
+        "name": "MaskProperNounsP(0.25)",
+        "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent if is_chance(0.25)],
+        "condition": lambda ent, doc: True,
         "mask_with": None,
-        "num_runs": None,
-        # .text
+        "num_runs": 5,
+    },
+    {  # probabilistic filter
+        "name": "MaskProperNounsP(0.5)",
+        "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent if is_chance(0.5)],
+        "condition": lambda ent, doc: True,
+        "mask_with": None,
+        "num_runs": 5,
+    },
+    {  # probabilistic filter
+        "name": "MaskProperNounsP(0.75)",
+        "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent if is_chance(0.75)],
+        "condition": lambda ent, doc: True,
+        "mask_with": None,
+        "num_runs": 5,
     },
     {
-        "name": "MaskAllNouns",
-        "get_tokens": lambda doc: doc,
-        "filtered_tokens": lambda doc: [token.i for token in doc if token.pos_ == "NOUN"],
+        "name": "MaskAllProperNouns",
+        "filtered_tokens": lambda doc: [token.i for ent in doc.ents for token in ent],
+        "condition": lambda ent, doc: True,
         "mask_with": None,
         "num_runs": None,
     },
@@ -44,9 +54,8 @@ TEST_FILENAME = "./data/test.json"
 TEST_FILENAME_TEMPLATE = "./data/test{}.json"
 TEST_BACKUP_FILENAME = "./data/test.bak.json"
 MODEL_NAME = 'roberta-base'
-PATH_TO_PYTHON_PROJECT = os.getcwd()
-PATH_TO_VENV = os.path.join(PATH_TO_PYTHON_PROJECT, '.env', 'Scripts', 'python')
-STATS_FILENAME = 'stats.json'
+PATH_TO_PYTHON_PROJECT = os.getcwd() # osp.join(os.getcwd(), osp.join('..', '..'))
+PATH_TO_VENV = os.path.join(PATH_TO_PYTHON_PROJECT, 'env', 'Scripts', 'python')
 
 # Using spaCy for NER
 nlp = spacy.load("en_core_web_sm")
@@ -270,23 +279,47 @@ def average_stats(stats):
         precisions.append(stat['precisions'])
         recalls.append(stat['recalls'])
 
-    average_advanced_scores = [sum(els)/len(advanced_scores) for els in zip(*advanced_scores)]
-    average_prec_recall_scores = [sum(els)/len(prec_recall_scores) for els in zip(*prec_recall_scores)]
-    average_precisions = [sum(els)/len(precisions) for els in zip(*precisions)]
-    average_recalls = [sum(els)/len(recalls) for els in zip(*recalls)]
+    # Initialize a new OrderedDict to hold the sums
+    average_advanced_scores = OrderedDict.fromkeys(advanced_scores[0], 0)
+
+    # Add up the values from each OrderedDict
+    for d in advanced_scores:
+        for key, value in d.items():
+            average_advanced_scores[key] += value
+
+    average_prec_recall_scores = OrderedDict.fromkeys(prec_recall_scores[0], 0)
+    del(average_prec_recall_scores['name'])
+
+    # Add up the values from each OrderedDict
+    for d in prec_recall_scores:
+        for key, value in d.items():
+            if key == 'name':
+                pass
+            else:
+                average_prec_recall_scores[key] += value
+
+    # Divide by the number of OrderedDicts to get the averages
+    average_advanced_scores = dict((key, value / len(advanced_scores)) for key, value in average_advanced_scores.items())
+    average_precisions = np.array(precisions).mean(axis=0)
+    average_recalls = np.array(recalls).mean(axis=0)
+    average_prec_recall_scores = dict((key, value / len(prec_recall_scores)) for key, value in average_prec_recall_scores.items())
+    # average_prec_recall_scores = [sum(els)/len(prec_recall_scores) for els in zip(*prec_recall_scores)]
+    # average_precisions = [sum(els)/len(precisions) for els in zip(*precisions)]
+    # average_recalls = [sum(els)/len(recalls) for els in zip(*recalls)]
+
 
 
     averaged_stats = {
         'advanced_scores': average_advanced_scores,
         'prec_recall_scores': average_prec_recall_scores,
-        'precisions': average_precisions,
-        'recalls': average_recalls
+        'precisions': list(average_precisions),
+        'recalls': list(average_recalls)
     }
 
     return averaged_stats
 
 
-def save_stats_to_file(new_stats, flt_name, filename=STATS_FILENAME):
+def save_stats_to_file(new_stats, flt_name, filename='stats.json'):
     if os.path.exists(filename):
         with open(filename, 'r') as file:
             stats = json.load(file)
@@ -319,18 +352,16 @@ def main():
             # stats, plots, common_plots = process_filter(flt, common_plots)
             stats = process_filter(flt)
         
-
-        save_stats_to_file(stats, flt['name'])
         # phase x: evaluate model performance, create plots, etc.
         # mutates common plots
-        eval_model(common_plots, stats['recalls'], stats['precisions'], stats['prec_recall_scores'], flt['name'])
-
-
-        global_stats.append({
-            'name': flt['name'],
-            'stats': stats,
-            # 'plots': plots
-        })
+        save_stats_to_file(stats, flt['name'])
+        # eval_model(common_plots, stats['recalls'], stats['precisions'], stats['prec_recall_scores'], flt['name'])
+        #
+        # global_stats.append({
+        #     'name': flt['name'],
+        #     'stats': stats,
+        #     # 'plots': plots
+        # })
 
     # process_results(global_stats, common_plots)
     # remove cached files
@@ -338,9 +369,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-
-
+ 
 
 
 
