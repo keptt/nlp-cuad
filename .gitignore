@@ -7,3 +7,4 @@ results/
 *.masked.*
 *.bak
 store/
+trained_models/*
