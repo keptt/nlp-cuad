@@ -359,6 +359,78 @@ def evaluate(args, model, tokenizer, prefix=""):
             eval_feature = features[feature_index.item()]
             unique_id = int(eval_feature.unique_id)
 
+            # [
+            #     batch_1 output for feature 1 = [ # represents all files in batch
+            #         element1, # every file has feature object which represents specific
+            #         element2 = feature_1 = [x, x2, x3, ...]
+            #         ... 
+            #     ],
+            #     batch_1 output for feature 2 = [
+            #         element1,
+            #         element2 = feature_2 = [x, x2, x3, ...]
+            #         ... 
+            #     ],
+            #     ...
+            #     batch_1 output for feature i = [
+            #         element1,
+            #         element2 = feature_i = [x, x2, x3, ...]
+            #         ... 
+            #     ]
+            # ],
+            # [
+            #     batch_2 output for feature 1 = [ # represents all files in batch
+            #         element1, # every file has feature object which represents specific
+            #         element2 = feature_1 = [x, x2, x3, ...]
+            #         ... 
+            #     ],
+            #     batch_2 output for feature 2 = [
+            #         element1,
+            #         element2 = feature_2 = [x, x2, x3, ...]
+            #         ... 
+            #     ],
+            #     ...
+            #     batch_2 output for feature i = [
+            #         element1,
+            #         element2 = feature_i = [x, x2, x3, ...]
+            #         ... 
+            #     ]
+            # ]
+
+            # features = [
+            #     batch output for feature 1 = [ # represents all files in batch
+            #         SquadResult1 per file, # every file has feature object which represents specific
+            #         SquadResult2 per file = feature_1 = [unique_feature_1_id, start_logits, end_logits, ...]
+            #         ... 
+            #     ],
+            #     batch output for feature 2 = [
+            #         SquadResult1 per file,
+            #         SquadResult2 per file = feature_2 = [unique_feature_2_id, start_logits, end_logits, ...]
+            #         ... 
+            #     ],
+            #     ...
+            #     batch output for feature i = [
+            #         SquadResult1 per file,
+            #         SquadResult2 per file = feature_i = [unique_feature_i_id, start_logits, end_logits, ...]
+            #         ... 
+            #     ]
+            # ]
+
+            # [
+            #     x1: batch for feature1 [
+            #         u1: [batch],
+            #         u2: [batch],
+            #         u3: [batch]
+            #     ]
+            #     x2: batch for feature1 [
+            #         v1,
+            #         v2,
+            #         v3
+            #     ]
+            #     x3: []
+            #     x4: []
+            #     x5: []
+            # ]
+
             output = [to_list(output[i]) for output in outputs.to_tuple()]
 
             # Some models (XLNet, XLM) use 5 arguments for their predictions, while the other "simpler"
@@ -878,3 +950,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

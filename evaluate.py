@@ -3,6 +3,8 @@ import json
 import pandas as pd
 import numpy as np
 from sklearn import metrics
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 IOU_THRESH = 0.5
 
@@ -197,7 +199,7 @@ def get_results(model_path, gt_dict, verbose=False):
 
     # now save results as a dataframe and return
     results = {"name": name, "aupr": aupr, "prec_at_80_recall": prec_at_80_recall, "prec_at_90_recall": prec_at_90_recall}
-    return results
+    return results, precisions, recalls
 
 
 if __name__ == "__main__":
@@ -209,8 +211,20 @@ if __name__ == "__main__":
     gt_dict = load_json(test_json_path)
     gt_dict = get_answers(gt_dict)
 
-    results = get_results(model_path, gt_dict, verbose=True)
+    results, precisions, recalls = get_results(model_path, gt_dict, verbose=True)
 
     save_path = os.path.join(save_dir, "{}.json".format(model_path.split("/")[-1]))
     with open(save_path, "w") as f:
         f.write("{}\n".format(results))
+
+    # Reverse the lists since they are in decreasing order
+    recalls = recalls[::-1]
+    precisions = precisions[::-1]
+
+    plt.figure(figsize=(10,8))
+    sns.set_style("whitegrid")
+    sns.lineplot(x=recalls, y=precisions, marker='o')
+    plt.title('Precision-Recall curve', fontsize=20)
+    plt.xlabel('Recall', fontsize=15)
+    plt.ylabel('Precision', fontsize=15)
+    plt.show()

@@ -1,0 +1,9 @@
+cached_*
+miscellaneous/
+.env/
+env/
+__pycache__/
+results/
+*.masked.*
+*.bak
+store/
