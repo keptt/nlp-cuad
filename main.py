@@ -7,6 +7,7 @@ import os.path as osp
 from evaluate_model import run_model, stats_precisions_recalls
 from collections import OrderedDict
 import numpy as np
+import math
 
 
 is_chance = lambda chance: random.random() <= chance
@@ -267,30 +268,125 @@ def process_filter(flt):
     return stats
 
 
-def average_stats(stats):
+
+def take_min_stats(list_of_stats):
     advanced_scores = []
     prec_recall_scores = []
     precisions = []
     recalls = []
 
-    for stat in stats:
+    for stat in list_of_stats:
         advanced_scores.append(stat['advanced_scores'])
         prec_recall_scores.append(stat['prec_recall_scores'])
         precisions.append(stat['precisions'])
         recalls.append(stat['recalls'])
 
     # Initialize a new OrderedDict to hold the sums
-    average_advanced_scores = OrderedDict.fromkeys(advanced_scores[0], 0)
+    minimized_advanced_scores = OrderedDict.fromkeys(advanced_scores[0], math.inf)
 
     # Add up the values from each OrderedDict
     for d in advanced_scores:
         for key, value in d.items():
-            average_advanced_scores[key] += value
+            if value < minimized_advanced_scores[key]:
+                minimized_advanced_scores[key] = value
+
+    minimized_prec_recall_scores = OrderedDict.fromkeys(prec_recall_scores[0], math.inf)
+    del(minimized_prec_recall_scores['name'])
+
+    # Add up the values from each OrderedDict
+    for d in prec_recall_scores:
+        for key, value in d.items():
+            if key == 'name':
+                pass
+            else:
+                if value < minimized_advanced_scores[key]:
+                    minimized_prec_recall_scores[key] = value
+
+    minimized_precisions = np.array(precisions).min(axis=0)
+    minimized_recalls = np.array(recalls).min(axis=0)
+
+    minimized_stats = {
+        'advanced_scores': minimized_advanced_scores,
+        'prec_recall_scores': minimized_prec_recall_scores,
+        'precisions': list(minimized_precisions),
+        'recalls': list(minimized_recalls)
+    }
+
+    return minimized_stats
+
+
+
+def take_max_stats(list_of_stats):
+    advanced_scores = []
+    prec_recall_scores = []
+    precisions = []
+    recalls = []
+
+    for stat in list_of_stats:
+        advanced_scores.append(stat['advanced_scores'])
+        prec_recall_scores.append(stat['prec_recall_scores'])
+        precisions.append(stat['precisions'])
+        recalls.append(stat['recalls'])
+
+    # Initialize a new OrderedDict to hold the sums
+    maximized_advanced_scores = OrderedDict.fromkeys(advanced_scores[0], -math.inf)
+
+    # Add up the values from each OrderedDict
+    for d in advanced_scores:
+        for key, value in d.items():
+            if value > maximized_advanced_scores[key]:
+                maximized_advanced_scores[key] = value
+
+    maximized_prec_recall_scores = OrderedDict.fromkeys(prec_recall_scores[0], -math.inf)
+    del(maximized_prec_recall_scores['name'])
+
+    # Compare the values from each OrderedDict
+    for d in prec_recall_scores:
+        for key, value in d.items():
+            if key == 'name':
+                pass
+            else:
+                if value > maximized_advanced_scores[key]:
+                    maximized_prec_recall_scores[key] = value
+
+    maximized_precisions = np.array(precisions).max(axis=0)
+    maximized_recalls = np.array(recalls).max(axis=0)
+
+    maximized_stats = {
+        'advanced_scores': maximized_advanced_scores,
+        'prec_recall_scores': maximized_prec_recall_scores,
+        'precisions': list(maximized_precisions),
+        'recalls': list(maximized_recalls)
+    }
+
+    return maximized_stats
+
+
+
+def average_stats(list_of_stats):
+    advanced_scores = []
+    prec_recall_scores = []
+    precisions = []
+    recalls = []
+
+    for stat in list_of_stats:
+        advanced_scores.append(stat['advanced_scores'])
+        prec_recall_scores.append(stat['prec_recall_scores'])
+        precisions.append(stat['precisions'])
+        recalls.append(stat['recalls'])
+
+    # Initialize a new OrderedDict to hold the sums
+    minimize_advanced_scores = OrderedDict.fromkeys(advanced_scores[0], 0)
+
+    # Add up the values from each OrderedDict
+    for d in advanced_scores:
+        for key, value in d.items():
+            minimize_advanced_scores[key] += value
 
     average_prec_recall_scores = OrderedDict.fromkeys(prec_recall_scores[0], 0)
     del(average_prec_recall_scores['name'])
 
-    # Add up the values from each OrderedDict
+    # Compare the values from each OrderedDict
     for d in prec_recall_scores:
         for key, value in d.items():
             if key == 'name':
@@ -299,7 +395,7 @@ def average_stats(stats):
                 average_prec_recall_scores[key] += value
 
     # Divide by the number of OrderedDicts to get the averages
-    average_advanced_scores = dict((key, value / len(advanced_scores)) for key, value in average_advanced_scores.items())
+    minimize_advanced_scores = dict((key, value / len(advanced_scores)) for key, value in minimize_advanced_scores.items())
     average_precisions = np.array(precisions).mean(axis=0)
     average_recalls = np.array(recalls).mean(axis=0)
     average_prec_recall_scores = dict((key, value / len(prec_recall_scores)) for key, value in average_prec_recall_scores.items())
@@ -307,10 +403,8 @@ def average_stats(stats):
     # average_precisions = [sum(els)/len(precisions) for els in zip(*precisions)]
     # average_recalls = [sum(els)/len(recalls) for els in zip(*recalls)]
 
-
-
     averaged_stats = {
-        'advanced_scores': average_advanced_scores,
+        'advanced_scores': minimize_advanced_scores,
         'prec_recall_scores': average_prec_recall_scores,
         'precisions': list(average_precisions),
         'recalls': list(average_recalls)
@@ -333,28 +427,51 @@ def save_stats_to_file(new_stats, flt_name, filename='stats.json'):
 
 
 
+def process_stats_for_probabilistic_filters(list_of_stats):
+    avg_stats = average_stats(list_of_stats) #, plots_to_be_averaged)
+    min_stats = take_min_stats(list_of_stats) #, plots_to_be_averaged)
+    max_stats = take_max_stats(list_of_stats) #, plots_to_be_averaged)
+
+    return avg_stats, min_stats, max_stats
+
+
+
 def main():
-    global_stats = []
+    # global_stats = []
     common_plots = {}
+    stats = []
+    min_stats = None
+    max_stats = None
 
     for flt in filters:
         stats = None
+        min_stats = None
+        max_stats = None
+
         if flt['num_runs']:
-            stats_to_be_averaged = []
+            list_of_stats = []
             # plots_to_be_averaged = []
 
             for _ in range(flt['num_runs']):
                 stats = process_filter(flt) # plots
-                stats_to_be_averaged.append(stats)
+                list_of_stats.append(stats)
                 # plots_to_be_averaged.append(plots)
-            stats = average_stats(stats_to_be_averaged) #, plots_to_be_averaged)
+            stats, min_stats, max_stats = process_stats_for_probabilistic_filters(list_of_stats)
+
         else:
             # stats, plots, common_plots = process_filter(flt, common_plots)
             stats = process_filter(flt)
         
         # phase x: evaluate model performance, create plots, etc.
         # mutates common plots
-        save_stats_to_file(stats, flt['name'])
+        save_stats_to_file(stats, flt['name'], 'stats.json')
+        if min_stats and max_stats:
+            save_stats_to_file(min_stats, flt['name'], 'stats.min.json')
+            save_stats_to_file(max_stats, flt['name'], 'stats.max.json')
+        else:
+            save_stats_to_file(stats, flt['name'], 'stats.min.json')
+            save_stats_to_file(stats, flt['name'], 'stats.max.json')
+
         # eval_model(common_plots, stats['recalls'], stats['precisions'], stats['prec_recall_scores'], flt['name'])
         #
         # global_stats.append({
